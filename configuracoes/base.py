@@ -100,7 +100,7 @@ DATABASES = {
         "USER": os.environ.get("DB_USUARIO", "postgres"),
         "PASSWORD": os.environ.get("DB_SENHA", ""),
         "HOST": os.environ.get("DB_HOST", "localhost"),
-        "PORT": os.environ.get("DB_PORTA", "5432"),
+        "PORT": os.environ.get("DB_PORTA", "5433"),
         "OPTIONS": {
             "options": "-c timezone=America/Sao_Paulo",
         },
