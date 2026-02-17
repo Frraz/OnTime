@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ontime_db
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME:-ontime}
+      POSTGRES_USER: ${DB_USER:-ontime_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ontime_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-ontime_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: ontime_redis
+    restart: always
+    networks:
+      - ontime_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    container_name: ontime_web
+    restart: always
+    command: gunicorn --bind 0.0.0.0:8000 --workers 4 --timeout 120 --access-logfile - --error-logfile - configuracoes.wsgi:application
+    volumes:
+      - ./staticfiles:/app/staticfiles
+      - ./media:/app/media
+    environment:
+      - DJANGO_SETTINGS_MODULE=configuracoes.producao
+      - DB_NAME=${DB_NAME:-ontime}
+      - DB_USER=${DB_USER:-ontime_user}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ontime_network
+    ports:
+      - "8000:8000"
+
+  celery:
+    build: .
+    container_name: ontime_celery
+    restart: always
+    command: celery -A configuracoes worker -l info
+    volumes:
+      - ./staticfiles:/app/staticfiles
+      - ./media:/app/media
+    environment:
+      - DJANGO_SETTINGS_MODULE=configuracoes.producao
+      - DB_NAME=${DB_NAME:-ontime}
+      - DB_USER=${DB_USER:-ontime_user}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY}
+    depends_on:
+      - db
+      - redis
+    networks:
+      - ontime_network
+
+  celery-beat:
+    build: .
+    container_name: ontime_celery_beat
+    restart: always
+    command: celery -A configuracoes beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    volumes:
+      - ./staticfiles:/app/staticfiles
+      - ./media:/app/media
+    environment:
+      - DJANGO_SETTINGS_MODULE=configuracoes.producao
+      - DB_NAME=${DB_NAME:-ontime}
+      - DB_USER=${DB_USER:-ontime_user}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY}
+    depends_on:
+      - db
+      - redis
+    networks:
+      - ontime_network
+
+volumes:
+  postgres_data:
+
+networks:
+  ontime_network:
+    driver: bridge
