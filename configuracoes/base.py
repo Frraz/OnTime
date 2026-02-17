@@ -96,11 +96,11 @@ WSGI_APPLICATION = "configuracoes.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("DB_NOME", "ontime_db"),
-        "USER": os.environ.get("DB_USUARIO", "postgres"),
-        "PASSWORD": os.environ.get("DB_SENHA", ""),
+        "NAME": os.environ.get("DB_NAME", "ontime_db"),
+        "USER": os.environ.get("DB_USER", "ontime_user"),
+        "PASSWORD": os.environ.get("DB_PASSWORD", ""),
         "HOST": os.environ.get("DB_HOST", "localhost"),
-        "PORT": os.environ.get("DB_PORTA", "5433"),
+        "PORT": os.environ.get("DB_PORT", "5433"),
         "OPTIONS": {
             "options": "-c timezone=America/Sao_Paulo",
         },
