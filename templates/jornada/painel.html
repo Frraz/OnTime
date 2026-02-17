@@ -1,0 +1,351 @@
+{% extends "base/base.html" %}
+
+{% block titulo %}Bater Ponto - OnTime{% endblock %}
+
+{% block conteudo %}
+<div 
+    x-data="{
+        mostrarCamera: false,
+        stream: null,
+        fotoCapturada: null,
+        mostrarModalSemFoto: false,
+        justificativaSemFoto: '',
+        latitude: null,
+        longitude: null,
+        gpsDisponivel: false,
+        
+        async iniciarCamera() {
+            this.mostrarCamera = true;
+            try {
+                this.stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'user' } 
+                });
+                this.$refs.video.srcObject = this.stream;
+            } catch (error) {
+                console.error('Erro ao acessar câmera:', error);
+                alert('Não foi possível acessar a câmera. Por favor, permita o acesso ou registre sem foto.');
+            }
+        },
+        
+        capturarFoto() {
+            const video = this.$refs.video;
+            const canvas = this.$refs.canvas;
+            const context = canvas.getContext('2d');
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0);
+            
+            this.fotoCapturada = canvas.toDataURL('image/jpeg', 0.8);
+            this.pararCamera();
+        },
+        
+        pararCamera() {
+            if (this.stream) {
+                this.stream.getTracks().forEach(track => track.stop());
+                this.stream = null;
+            }
+            this.mostrarCamera = false;
+        },
+        
+        refazerFoto() {
+            this.fotoCapturada = null;
+            this.iniciarCamera();
+        },
+        
+        async obterLocalizacao() {
+            if (navigator.geolocation) {
+                try {
+                    const position = await new Promise((resolve, reject) => {
+                        navigator.geolocation.getCurrentPosition(resolve, reject, {
+                            enableHighAccuracy: true,
+                            timeout: 10000,
+                            maximumAge: 0
+                        });
+                    });
+                    
+                    this.latitude = position.coords.latitude;
+                    this.longitude = position.coords.longitude;
+                    this.gpsDisponivel = true;
+                } catch (error) {
+                    console.error('Erro ao obter GPS:', error);
+                    this.gpsDisponivel = false;
+                }
+            }
+        },
+        
+        async registrarPonto() {
+            await this.obterLocalizacao();
+            
+            const form = this.$refs.formRegistro;
+            const inputFoto = form.querySelector('[name=foto]');
+            const inputLat = form.querySelector('[name=latitude]');
+            const inputLng = form.querySelector('[name=longitude]');
+            
+            inputFoto.value = this.fotoCapturada || '';
+            inputLat.value = this.latitude || '';
+            inputLng.value = this.longitude || '';
+            
+            form.submit();
+        },
+        
+        abrirModalSemFoto() {
+            this.mostrarModalSemFoto = true;
+        },
+        
+        async registrarSemFoto() {
+            if (!this.justificativaSemFoto.trim()) {
+                alert('Por favor, informe o motivo do registro sem foto.');
+                return;
+            }
+            
+            await this.obterLocalizacao();
+            
+            const form = this.$refs.formRegistro;
+            const inputFoto = form.querySelector('[name=foto]');
+            const inputLat = form.querySelector('[name=latitude]');
+            const inputLng = form.querySelector('[name=longitude]');
+            const inputJustificativa = form.querySelector('[name=justificativa_sem_foto]');
+            
+            inputFoto.value = '';
+            inputLat.value = this.latitude || '';
+            inputLng.value = this.longitude || '';
+            inputJustificativa.value = this.justificativaSemFoto;
+            
+            form.submit();
+        }
+    }"
+    class="max-w-7xl mx-auto"
+>
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">Registro de Ponto</h1>
+        <p class="text-gray-600">
+            {% now "l, d \d\e F \d\e Y - H:i" %}
+        </p>
+    </div>
+    
+    <!-- Info do Vínculo -->
+    <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                </svg>
+            </div>
+            <div class="ml-3">
+                <p class="text-sm text-blue-700">
+                    <strong>Seu vínculo:</strong> {{ vinculo_info.tipo }}
+                    {% if vinculo_info.precisa_gps %}
+                        • Requer GPS {% if vinculo_info.precisa_local %}e validação de local{% endif %}
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Card Principal -->
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div class="bg-gradient-to-r from-blue-600 to-blue-700 p-6">
+            <h2 class="text-2xl font-bold text-white">
+                Próximo Registro: 
+                <span class="{% if proximo_tipo == 'IN' %}text-green-300{% else %}text-red-300{% endif %}">
+                    {{ proximo_tipo|default:"IN" }}
+                </span>
+            </h2>
+        </div>
+        
+        <div class="p-8">
+            <!-- Camera / Foto -->
+            <div class="mb-8">
+                <div x-show="!mostrarCamera && !fotoCapturada" class="text-center">
+                    <div class="mb-4">
+                        <svg class="mx-auto h-24 w-24 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                    </div>
+                    
+                    {% if precisa_foto %}
+                        <p class="text-gray-600 mb-6">
+                            📸 <strong>Foto obrigatória</strong> para o primeiro registro do dia
+                        </p>
+                        
+                        <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                            <button 
+                                type="button"
+                                @click="iniciarCamera()"
+                                class="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 font-semibold transition-colors inline-flex items-center justify-center space-x-2"
+                            >
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                </svg>
+                                <span>Tirar Foto</span>
+                            </button>
+                            
+                            <button 
+                                type="button"
+                                @click="abrirModalSemFoto()"
+                                class="bg-gray-600 text-white px-8 py-3 rounded-lg hover:bg-gray-700 font-semibold transition-colors inline-flex items-center justify-center space-x-2"
+                            >
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                </svg>
+                                <span>Registrar Sem Foto</span>
+                            </button>
+                        </div>
+                    {% else %}
+                        <button 
+                            type="button"
+                            @click="registrarPonto()"
+                            class="bg-green-600 text-white px-8 py-3 rounded-lg hover:bg-green-700 font-semibold transition-colors"
+                        >
+                            Registrar Ponto
+                        </button>
+                    {% endif %}
+                </div>
+                
+                <!-- Preview da Câmera -->
+                <div x-show="mostrarCamera" x-cloak class="relative">
+                    <video x-ref="video" autoplay playsinline class="w-full rounded-lg"></video>
+                    <canvas x-ref="canvas" class="hidden"></canvas>
+                    <div class="mt-4 flex justify-center space-x-4">
+                        <button 
+                            type="button"
+                            @click="capturarFoto()"
+                            class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 font-semibold"
+                        >
+                            Capturar Foto
+                        </button>
+                        <button 
+                            type="button"
+                            @click="pararCamera()"
+                            class="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 font-semibold"
+                        >
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Preview da Foto Capturada -->
+                <div x-show="fotoCapturada" x-cloak class="text-center">
+                    <img :src="fotoCapturada" class="mx-auto rounded-lg shadow-lg mb-4" style="max-width: 400px;">
+                    <div class="flex justify-center space-x-4">
+                        <button 
+                            type="button"
+                            @click="registrarPonto()"
+                            class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 font-semibold"
+                        >
+                            ✓ Confirmar e Registrar
+                        </button>
+                        <button 
+                            type="button"
+                            @click="refazerFoto()"
+                            class="bg-orange-600 text-white px-6 py-3 rounded-lg hover:bg-orange-700 font-semibold"
+                        >
+                            Refazer Foto
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Registros de Hoje -->
+    {% if registros_hoje %}
+        <div class="mt-8 bg-white rounded-xl shadow-lg overflow-hidden">
+            <div class="p-6 bg-gray-50 border-b border-gray-200">
+                <h3 class="text-xl font-bold text-gray-800">Registros de Hoje</h3>
+            </div>
+            <div class="divide-y divide-gray-200">
+                {% for registro in registros_hoje %}
+                    <div class="p-4 hover:bg-gray-50">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-4">
+                                <div class="h-10 w-10 rounded-full flex items-center justify-center {% if registro.tipo == 'IN' %}bg-green-100{% else %}bg-red-100{% endif %}">
+                                    <span class="font-bold {% if registro.tipo == 'IN' %}text-green-600{% else %}text-red-600{% endif %}">
+                                        {{ registro.tipo }}
+                                    </span>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-gray-900">{{ registro.data_hora|date:"H:i" }}</p>
+                                    <p class="text-sm text-gray-500">{{ registro.get_origem_display }}</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-3 text-sm text-gray-600">
+                                {% if registro.foto %}
+                                    <span class="text-green-600">📸 Com foto</span>
+                                {% endif %}
+                                {% if registro.latitude %}
+                                    <span class="text-purple-600">📍 GPS</span>
+                                {% endif %}
+                                {% if registro.validacao_local %}
+                                    <span class="text-blue-600">✓ Validado</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+    
+    <!-- Form Oculto -->
+    <form 
+        x-ref="formRegistro"
+        method="post" 
+        action="{% url 'jornada:registrar' %}"
+        class="hidden"
+    >
+        {% csrf_token %}
+        <input type="hidden" name="foto" value="">
+        <input type="hidden" name="latitude" value="">
+        <input type="hidden" name="longitude" value="">
+        <input type="hidden" name="justificativa_sem_foto" value="">
+    </form>
+    
+    <!-- Modal Justificativa Sem Foto -->
+    <div 
+        x-show="mostrarModalSemFoto"
+        x-cloak
+        class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+        @click.self="mostrarModalSemFoto = false"
+    >
+        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full">
+            <div class="p-6 border-b border-gray-200">
+                <h3 class="text-2xl font-bold text-gray-900">Registrar Sem Foto</h3>
+                <p class="text-sm text-gray-600 mt-2">Por favor, informe o motivo do registro sem foto</p>
+            </div>
+            <div class="p-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Motivo *
+                </label>
+                <textarea
+                    x-model="justificativaSemFoto"
+                    rows="4"
+                    placeholder="Ex: Câmera não está funcionando, falta de permissão, etc..."
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                ></textarea>
+                
+                <div class="flex justify-end space-x-4 mt-6">
+                    <button 
+                        type="button"
+                        @click="mostrarModalSemFoto = false; justificativaSemFoto = ''"
+                        class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-semibold transition-colors"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                        type="button"
+                        @click="registrarSemFoto()"
+                        class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition-colors"
+                    >
+                        Registrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

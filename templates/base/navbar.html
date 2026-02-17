@@ -1,0 +1,56 @@
+<nav class="bg-blue-600 text-white shadow-lg fixed w-full z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-16">
+            <div class="flex items-center">
+                <button 
+                    id="menu-toggle"
+                    class="lg:hidden p-2 rounded-md hover:bg-blue-700"
+                    onclick="toggleSidebar()"
+                >
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+                
+                <h1 class="text-2xl font-bold ml-4">OnTime</h1>
+            </div>
+            
+            <div class="flex items-center space-x-4">
+                {% if empresa_ativa %}
+                    <span class="text-sm bg-blue-500 px-3 py-1 rounded-full">
+                        {{ empresa_ativa.nome_fantasia|default:empresa_ativa.razao_social }}
+                    </span>
+                {% endif %}
+                
+                <div class="relative" x-data="{ open: false }">
+                    <button 
+                        @click="open = !open"
+                        class="flex items-center space-x-2 hover:bg-blue-700 px-3 py-2 rounded-md"
+                    >
+                        <div class="w-8 h-8 bg-blue-400 rounded-full flex items-center justify-center">
+                            <span class="font-bold">{{ user.first_name.0|default:user.username.0|upper }}</span>
+                        </div>
+                        <span>{{ user.first_name|default:user.username }}</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    
+                    <div 
+                        x-show="open"
+                        @click.away="open = false"
+                        x-transition
+                        class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 text-gray-700"
+                    >
+                        <a href="{% url 'usuarios:perfil' %}" class="block px-4 py-2 hover:bg-gray-100">
+                            Meu Perfil
+                        </a>
+                        <a href="{% url 'usuarios:logout' %}" class="block px-4 py-2 hover:bg-gray-100 text-red-600">
+                            Sair
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</nav>

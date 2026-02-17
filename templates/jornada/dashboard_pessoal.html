@@ -1,0 +1,284 @@
+{% extends "base/base.html" %}
+
+{% block titulo %}Dashboard - OnTime{% endblock %}
+
+{% block conteudo %}
+<div class="max-w-7xl mx-auto">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">Meu Dashboard</h1>
+    
+    <!-- Cards de Resumo -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        <!-- Horas Hoje -->
+        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg p-6 text-white">
+            <div class="flex items-center justify-between mb-2">
+                <p class="text-sm opacity-90">Horas Hoje</p>
+                <svg class="w-8 h-8 opacity-75" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <p class="text-4xl font-bold">{{ resumo_hoje.horas_hoje }}h</p>
+            <p class="text-sm opacity-75 mt-1">
+                {% if resumo_hoje.dentro %}
+                    🟢 Trabalhando agora
+                {% else %}
+                    ⚪ Fora do expediente
+                {% endif %}
+            </p>
+        </div>
+        
+        <!-- Semana Atual -->
+        <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-lg p-6 text-white">
+            <div class="flex items-center justify-between mb-2">
+                <p class="text-sm opacity-90">Semana Atual</p>
+                <svg class="w-8 h-8 opacity-75" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                </svg>
+            </div>
+            <p class="text-4xl font-bold">{{ semana_atual.horas_trabalhadas }}h</p>
+            <p class="text-sm opacity-75 mt-1">
+                de {{ semana_atual.horas_esperadas }}h esperadas
+            </p>
+            <div class="mt-3 bg-white bg-opacity-20 rounded-full h-2">
+                <div class="bg-white rounded-full h-2 transition-all duration-500" style="width: {{ semana_atual.progresso }}%"></div>
+            </div>
+        </div>
+        
+        <!-- Saldo Semana -->
+        <div class="bg-gradient-to-br {% if semana_atual.saldo >= 0 %}from-purple-500 to-purple-600{% else %}from-orange-500 to-orange-600{% endif %} rounded-lg shadow-lg p-6 text-white">
+            <div class="flex items-center justify-between mb-2">
+                <p class="text-sm opacity-90">Saldo Semana</p>
+                <svg class="w-8 h-8 opacity-75" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path>
+                </svg>
+            </div>
+            <p class="text-4xl font-bold">
+                {% if semana_atual.saldo > 0 %}+{% endif %}{{ semana_atual.saldo }}h
+            </p>
+            <p class="text-sm opacity-75 mt-1">
+                {{ semana_atual.ano }}S{{ semana_atual.semana|stringformat:"02d" }}
+            </p>
+        </div>
+        
+        <!-- Registros Hoje -->
+        <div class="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg shadow-lg p-6 text-white">
+            <div class="flex items-center justify-between mb-2">
+                <p class="text-sm opacity-90">Registros Hoje</p>
+                <svg class="w-8 h-8 opacity-75" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                </svg>
+            </div>
+            <p class="text-4xl font-bold">{{ resumo_hoje.registros_hoje }}</p>
+            {% if resumo_hoje.primeira_entrada %}
+            <p class="text-sm opacity-75 mt-1">
+                Entrada: {{ resumo_hoje.primeira_entrada|date:"H:i" }}
+            </p>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Gráficos -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <!-- Gráfico: Horas Trabalhadas vs Esperadas -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Últimas 12 Semanas</h2>
+            <div style="position: relative; height: 300px;">
+                <canvas id="chartHorasSemanas"></canvas>
+            </div>
+        </div>
+        
+        <!-- Gráfico: Evolução Banco de Horas -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Evolução do Banco de Horas</h2>
+            <div style="position: relative; height: 300px;">
+                <canvas id="chartBancoHoras"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Gráfico: Média por Dia da Semana -->
+    <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-800 mb-4">Média de Horas por Dia da Semana</h2>
+        <div style="position: relative; height: 250px;">
+            <canvas id="chartDiaSemana"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<script>
+// Dados do backend
+const ultimasSemanas = {{ ultimas_semanas|safe }};
+const evolucaoBanco = {{ evolucao_banco|safe }};
+const horasDiaSemana = {{ horas_dia_semana|safe }};
+
+// Cores
+const colors = {
+    primary: 'rgb(59, 130, 246)',
+    success: 'rgb(34, 197, 94)',
+    warning: 'rgb(251, 146, 60)',
+    danger: 'rgb(239, 68, 68)',
+    gray: 'rgb(156, 163, 175)',
+};
+
+// Gráfico 1: Horas Trabalhadas vs Esperadas
+const ctx1 = document.getElementById('chartHorasSemanas').getContext('2d');
+new Chart(ctx1, {
+    type: 'bar',
+    data: {
+        labels: ultimasSemanas.map(s => s.label),
+        datasets: [
+            {
+                label: 'Trabalhadas',
+                data: ultimasSemanas.map(s => s.trabalhadas),
+                backgroundColor: colors.primary,
+                borderRadius: 6,
+            },
+            {
+                label: 'Esperadas',
+                data: ultimasSemanas.map(s => s.esperadas),
+                backgroundColor: colors.gray,
+                borderRadius: 6,
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: true,
+                position: 'top',
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + 'h';
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return value + 'h';
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Gráfico 2: Evolução Banco de Horas
+const ctx2 = document.getElementById('chartBancoHoras').getContext('2d');
+new Chart(ctx2, {
+    type: 'line',
+    data: {
+        labels: evolucaoBanco.map(s => s.label),
+        datasets: [{
+            label: 'Saldo Acumulado',
+            data: evolucaoBanco.map(s => s.saldo_acumulado),
+            borderColor: colors.primary,
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            fill: true,
+            tension: 0.4,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false,
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        const value = context.parsed.y;
+                        return 'Saldo: ' + (value >= 0 ? '+' : '') + value.toFixed(2) + 'h';
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                ticks: {
+                    callback: function(value) {
+                        return (value >= 0 ? '+' : '') + value + 'h';
+                    }
+                },
+                grid: {
+                    color: function(context) {
+                        if (context.tick.value === 0) {
+                            return 'rgba(0, 0, 0, 0.3)';
+                        }
+                        return 'rgba(0, 0, 0, 0.05)';
+                    },
+                    lineWidth: function(context) {
+                        if (context.tick.value === 0) {
+                            return 2;
+                        }
+                        return 1;
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Gráfico 3: Média por Dia da Semana
+const ctx3 = document.getElementById('chartDiaSemana').getContext('2d');
+new Chart(ctx3, {
+    type: 'bar',
+    data: {
+        labels: horasDiaSemana.map(d => d.dia),
+        datasets: [{
+            label: 'Média de Horas',
+            data: horasDiaSemana.map(d => d.horas),
+            backgroundColor: [
+                colors.primary,
+                colors.primary,
+                colors.primary,
+                colors.primary,
+                colors.primary,
+                colors.success,
+                colors.warning,
+            ],
+            borderRadius: 6,
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false,
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return 'Média: ' + context.parsed.y.toFixed(2) + 'h';
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                max: 10,
+                ticks: {
+                    callback: function(value) {
+                        return value + 'h';
+                    }
+                }
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

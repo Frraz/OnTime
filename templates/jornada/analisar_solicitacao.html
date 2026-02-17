@@ -1,0 +1,113 @@
+{% extends "base/base.html" %}
+
+{% block titulo %}Analisar Solicitação - OnTime{% endblock %}
+
+{% block conteudo %}
+<div class="max-w-4xl mx-auto">
+    <div class="mb-6">
+        <a href="{% url 'jornada:listar_solicitacoes' %}" class="text-blue-600 hover:text-blue-800">
+            ← Voltar às Solicitações
+        </a>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow p-8">
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">Analisar Solicitação de Ajuste</h1>
+        
+        <!-- Info do Solicitante -->
+        <div class="bg-blue-50 rounded-lg p-6 mb-6">
+            <div class="flex items-center space-x-4">
+                <div class="flex-shrink-0 h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center">
+                    <span class="text-blue-600 font-bold text-2xl">
+                        {{ solicitacao.solicitante.username|slice:":2"|upper }}
+                    </span>
+                </div>
+                <div>
+                    <h2 class="text-xl font-semibold text-gray-900">{{ solicitacao.solicitante.username }}</h2>
+                    <p class="text-sm text-gray-600">{{ solicitacao.solicitante.nome_completo }}</p>
+                    <p class="text-sm text-gray-500">Solicitado em {{ solicitacao.criado_em|date:"d/m/Y H:i" }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Comparação -->
+        <div class="grid grid-cols-2 gap-6 mb-6">
+            <div>
+                <h3 class="text-lg font-semibold text-gray-800 mb-3">Registro Original</h3>
+                <div class="bg-red-50 border-l-4 border-red-400 rounded-lg p-4">
+                    <p class="text-sm text-gray-600 mb-1">Tipo</p>
+                    <p class="text-lg font-semibold text-gray-900 mb-3">
+                        {{ solicitacao.registro_original.get_tipo_display }}
+                    </p>
+                    
+                    <p class="text-sm text-gray-600 mb-1">Data/Hora</p>
+                    <p class="text-2xl font-bold text-red-700">
+                        {{ solicitacao.registro_original.data_hora|date:"d/m/Y H:i" }}
+                    </p>
+                </div>
+            </div>
+            
+            <div>
+                <h3 class="text-lg font-semibold text-gray-800 mb-3">Data/Hora Desejada</h3>
+                <div class="bg-green-50 border-l-4 border-green-400 rounded-lg p-4">
+                    <p class="text-sm text-gray-600 mb-1">Tipo</p>
+                    <p class="text-lg font-semibold text-gray-900 mb-3">
+                        {{ solicitacao.registro_original.get_tipo_display }}
+                    </p>
+                    
+                    <p class="text-sm text-gray-600 mb-1">Data/Hora Corrigida</p>
+                    <p class="text-2xl font-bold text-green-700">
+                        {{ solicitacao.data_hora_desejada|date:"d/m/Y H:i" }}
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Justificativa -->
+        <div class="mb-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-3">Justificativa do Colaborador</h3>
+            <div class="bg-gray-50 rounded-lg p-4">
+                <p class="text-gray-800">{{ solicitacao.justificativa }}</p>
+            </div>
+        </div>
+        
+        <!-- Formulário de Análise -->
+        <form method="post" class="border-t pt-6">
+            {% csrf_token %}
+            
+            <div class="mb-6">
+                <label for="observacao" class="block text-sm font-medium text-gray-700 mb-2">
+                    Observação da Análise
+                </label>
+                <textarea 
+                    name="observacao" 
+                    id="observacao"
+                    rows="4"
+                    placeholder="Adicione comentários sobre sua decisão (obrigatório para rejeição)"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                ></textarea>
+            </div>
+            
+            <div class="flex space-x-4">
+                <button 
+                    type="submit"
+                    name="acao"
+                    value="rejeitar"
+                    onclick="return confirm('Tem certeza que deseja REJEITAR esta solicitação?')"
+                    class="flex-1 bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 font-semibold transition-colors"
+                >
+                    ✗ Rejeitar
+                </button>
+                <button 
+                    type="submit"
+                    name="acao"
+                    value="aprovar"
+                    onclick="return confirm('Tem certeza que deseja APROVAR esta solicitação? O registro original será substituído.')"
+                    class="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 font-semibold transition-colors"
+                >
+                    ✓ Aprovar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
