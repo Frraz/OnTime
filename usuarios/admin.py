@@ -1,3 +1,4 @@
+# usuarios/admin.py
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import Usuario, PapelUsuario
@@ -18,7 +19,6 @@ class UsuarioAdmin(BaseUserAdmin):
     list_filter = ("papel", "vinculo", "ativo", "is_staff", "is_superuser", "empresa")
     search_fields = ("username", "email", "first_name", "last_name", "matricula")
     ordering = ("username",)
-
     fieldsets = (
         (None, {"fields": ("username", "password")}),
         (
@@ -54,9 +54,7 @@ class UsuarioAdmin(BaseUserAdmin):
             {"fields": ("last_login", "date_joined", "criado_em", "atualizado_em")},
         ),
     )
-
     readonly_fields = ("criado_em", "atualizado_em", "last_login", "date_joined")
-
     add_fieldsets = (
         (
             None,
@@ -75,31 +73,44 @@ class UsuarioAdmin(BaseUserAdmin):
         ),
     )
 
+    def _eh_superusuario_real(self, user):
+        """
+        Considera superusuário quem tem is_superuser=True (Django nativo)
+        OU papel=SUPERUSUARIO. Isso garante compatibilidade com usuários
+        criados via createsuperuser (que não preenchem o campo 'papel').
+        """
+        return user.is_superuser or user.papel == PapelUsuario.SUPERUSUARIO
+
     def get_queryset(self, request):
-        """
-        Filtro de queryset baseado no papel do usuário logado.
-        
-        IMPORTANTE: Superusuários veem TODOS, incluindo usuários sem empresa.
-        Administradores veem apenas da sua empresa.
-        """
         qs = super().get_queryset(request)
-        
-        # Superusuários veem todos os usuários (inclusive sem empresa)
-        if request.user.papel == PapelUsuario.SUPERUSUARIO:
+
+        # Superusuários veem todos, com ou sem empresa
+        if self._eh_superusuario_real(request.user):
             return qs
-        
+
         # Administradores veem apenas usuários da sua empresa
         if request.user.papel == PapelUsuario.ADMINISTRADOR and request.user.empresa:
             return qs.filter(empresa=request.user.empresa)
-        
-        # Colaboradores não acessam admin de usuários
+
+        # Demais não acessam
         return qs.none()
 
     def save_model(self, request, obj, form, change):
         """
-        Ao salvar, ajusta is_staff e is_superuser baseado no papel.
+        Sincroniza papel <-> flags Django (is_staff / is_superuser).
+
+        Regra de prioridade:
+        - Se is_superuser=True foi marcado manualmente, eleva o papel para SUPERUSUARIO.
+        - Caso contrário, o papel é quem manda e ajusta as flags.
+
+        Isso evita inconsistência entre usuários criados via admin e via createsuperuser.
         """
-        # Sincronizar papel com permissões Django
+        if obj.is_superuser and obj.papel != PapelUsuario.SUPERUSUARIO:
+            # Usuário criado via createsuperuser ou promovido manualmente:
+            # alinha o papel ao is_superuser do Django.
+            obj.papel = PapelUsuario.SUPERUSUARIO
+
+        # A partir daqui o papel é a fonte da verdade
         if obj.papel == PapelUsuario.SUPERUSUARIO:
             obj.is_staff = True
             obj.is_superuser = True
@@ -109,5 +120,5 @@ class UsuarioAdmin(BaseUserAdmin):
         else:  # COLABORADOR
             obj.is_staff = False
             obj.is_superuser = False
-        
+
         super().save_model(request, obj, form, change)
