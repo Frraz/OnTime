@@ -1,26 +1,29 @@
 """
 Configurações base do OnTime.
-Compartilhadas entre todos os ambientes.
+Compartilhadas entre todos os ambientes (desenvolvimento, produção, testes).
+
+Variáveis de ambiente são lidas do arquivo .env na raiz do projeto.
 """
 import os
 from pathlib import Path
-from dotenv import load_dotenv
-import environ  
 
-load_dotenv()
+import environ
 
-env = environ.Env(
-    DEBUG=(bool, False)
-)
-
+# ============================================================
+# DIRETÓRIO BASE E VARIÁVEIS DE AMBIENTE
+# ============================================================
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+env = environ.Env(
+    DEBUG=(bool, False),
+)
+environ.Env.read_env(BASE_DIR / ".env")
 
-SECRET_KEY = os.environ.get("SECRET_KEY", "chave-insegura-apenas-para-desenvolvimento")
-
+# ============================================================
+# SEGURANÇA (valores padrão seguros — sobrescreva nos ambientes)
+# ============================================================
+SECRET_KEY = env("SECRET_KEY", default="chave-insegura-apenas-para-desenvolvimento")
 DEBUG = False
-
 ALLOWED_HOSTS = []
 
 # ============================================================
@@ -67,6 +70,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "configuracoes.urls"
+WSGI_APPLICATION = "configuracoes.wsgi.application"
 
 # ============================================================
 # TEMPLATES
@@ -88,19 +92,17 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "configuracoes.wsgi.application"
-
 # ============================================================
 # BANCO DE DADOS
 # ============================================================
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("DB_NAME", "ontime_db"),
-        "USER": os.environ.get("DB_USER", "ontime_user"),
-        "PASSWORD": os.environ.get("DB_PASSWORD", ""),
-        "HOST": os.environ.get("DB_HOST", "localhost"),
-        "PORT": os.environ.get("DB_PORT", "5433"),
+        "NAME":     env("DB_NAME",     default="ontime_db"),
+        "USER":     env("DB_USER",     default="ontime_user"),
+        "PASSWORD": env("DB_PASSWORD", default=""),
+        "HOST":     env("DB_HOST",     default="localhost"),
+        "PORT":     env("DB_PORT",     default="5433"),
         "OPTIONS": {
             "options": "-c timezone=America/Sao_Paulo",
         },
@@ -119,7 +121,7 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-LOGIN_URL = "/usuarios/login/"
+LOGIN_URL          = "/usuarios/login/"
 LOGIN_REDIRECT_URL = "/jornada/painel/"
 LOGOUT_REDIRECT_URL = "/usuarios/login/"
 
@@ -127,54 +129,37 @@ LOGOUT_REDIRECT_URL = "/usuarios/login/"
 # INTERNACIONALIZAÇÃO
 # ============================================================
 LANGUAGE_CODE = "pt-br"
-TIME_ZONE = "America/Sao_Paulo"
-USE_I18N = True
-USE_TZ = True
+TIME_ZONE     = "America/Sao_Paulo"
+USE_I18N      = True
+USE_TZ        = True
 
 # ============================================================
 # ARQUIVOS ESTÁTICOS E MÍDIA
 # ============================================================
-STATIC_URL = "/estaticos/"
+STATIC_URL       = "/estaticos/"
 STATICFILES_DIRS = [BASE_DIR / "estaticos"]
-STATIC_ROOT = BASE_DIR / "staticfiles"
+STATIC_ROOT      = BASE_DIR / "staticfiles"
 
-MEDIA_URL = "/midia/"
+MEDIA_URL  = "/midia/"
 MEDIA_ROOT = BASE_DIR / "midia"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ============================================================
-# CELERY
-# ============================================================
-CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
-CELERY_TIMEZONE = "America/Sao_Paulo"
-CELERY_TASK_TRACK_STARTED = True
-
-# ============================================================
 # SESSÃO
 # ============================================================
-SESSION_ENGINE = "django.contrib.sessions.backends.db"
-SESSION_COOKIE_AGE = 28800  # 8 horas
+SESSION_ENGINE        = "django.contrib.sessions.backends.db"
+SESSION_COOKIE_AGE    = 28800   # 8 horas
 SESSION_COOKIE_HTTPONLY = True
 
-# ============================================================================
+# ============================================================
 # CELERY
-# ============================================================================
-
-CELERY_BROKER_URL = env('CELERY_BROKER_URL', default='redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND', default='redis://localhost:6379/0')
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TIMEZONE = TIME_ZONE
+# ============================================================
+CELERY_BROKER_URL      = env("CELERY_BROKER_URL",      default="redis://localhost:6379/0")
+CELERY_RESULT_BACKEND  = env("CELERY_RESULT_BACKEND",  default="redis://localhost:6379/0")
+CELERY_ACCEPT_CONTENT  = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE          = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
-CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutos
-
-
-# ============================================================================
-# MEDIA FILES (uploads)
-# ============================================================================
-
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+CELERY_TASK_TIME_LIMIT    = 30 * 60  # 30 minutos
