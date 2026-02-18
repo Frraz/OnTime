@@ -1,416 +1,498 @@
 {% extends "base/base.html" %}
 
-{% block titulo %}Histórico de Registros - OnTime{% endblock %}
+{% block titulo %}Histórico de Registros{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* ── Entrada staggered dos grupos de dia ── */
+    .dia-group {
+        animation: groupReveal 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    @keyframes groupReveal {
+        from { opacity: 0; transform: translateY(12px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Linha do tempo lateral ── */
+    .timeline-line {
+        position: absolute;
+        left: 19px;
+        top: 40px;
+        bottom: 0;
+        width: 2px;
+        background: linear-gradient(to bottom, #e2e8f0 0%, transparent 100%);
+    }
+
+    /* ── Dot do registro ── */
+    .registro-dot {
+        position: relative;
+        z-index: 1;
+    }
+
+    /* ── Hover no card de registro ── */
+    .registro-card {
+        transition: background 0.15s ease, box-shadow 0.15s ease;
+    }
+    .registro-card:hover {
+        background: #f8fafc;
+        box-shadow: inset 3px 0 0 #2563eb;
+    }
+
+    /* ── Badge tipo entrada/saída ── */
+    .tipo-entrada { background: #dcfce7; color: #15803d; }
+    .tipo-saida   { background: #fee2e2; color: #b91c1c; }
+
+    /* ── Filtros collapse ── */
+    [x-cloak] { display: none !important; }
+
+    /* ── Stats card ── */
+    .stat-card {
+        animation: groupReveal 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    .stat-card:nth-child(1) { animation-delay: 0.04s; }
+    .stat-card:nth-child(2) { animation-delay: 0.08s; }
+    .stat-card:nth-child(3) { animation-delay: 0.12s; }
+    .stat-card:nth-child(4) { animation-delay: 0.16s; }
+</style>
+{% endblock %}
 
 {% block conteudo %}
-<div class="max-w-7xl mx-auto">
-    <div class="flex justify-between items-center mb-6">
-        <h1 class="text-3xl font-bold text-gray-800">Histórico de Registros</h1>
-        
-        <!-- Botão Filtros -->
-        <button 
-            @click="showFilters = !showFilters"
-            class="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            x-data="{ showFilters: false }"
-        >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
-            </svg>
-            <span>Filtros</span>
-        </button>
+
+<!-- ── Cabeçalho ── -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6"
+     x-data="{ showFilters: {% if data_inicio or data_fim or tipo_filtro or origem_filtro %}true{% else %}false{% endif %} }">
+
+    <div>
+        <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Histórico de Registros</h1>
+        <p class="text-sm text-slate-500 mt-0.5">Todos os seus registros de ponto</p>
     </div>
-    
-    <!-- Filtros Avançados -->
-    <div 
-        x-data="{ showFilters: false }" 
+
+    <div class="flex items-center gap-2">
+        <!-- Botão filtros -->
+        <button
+            @click="showFilters = !showFilters"
+            :class="showFilters ? 'bg-brand-700 text-white border-brand-700' : 'bg-white text-slate-600 border-slate-200 hover:border-brand-300 hover:text-brand-700'"
+            class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border text-sm font-medium transition-all"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+            </svg>
+            Filtros
+            {% if data_inicio or data_fim or tipo_filtro or origem_filtro %}
+            <span class="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
+            {% endif %}
+        </button>
+
+        <a href="{% url 'jornada:painel' %}"
+           class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-brand-700 text-white text-sm font-medium hover:bg-brand-800 transition-colors shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" stroke-width="2"/>
+                <polyline points="12 6 12 12 16 14" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            Bater Ponto
+        </a>
+    </div>
+
+    <!-- ── Painel de Filtros ── -->
+    <div
         x-show="showFilters"
         x-cloak
         x-transition:enter="transition ease-out duration-200"
-        x-transition:enter-start="opacity-0 scale-95"
-        x-transition:enter-end="opacity-100 scale-100"
+        x-transition:enter-start="opacity-0 -translate-y-2"
+        x-transition:enter-end="opacity-100 translate-y-0"
         x-transition:leave="transition ease-in duration-150"
-        x-transition:leave-start="opacity-100 scale-100"
-        x-transition:leave-end="opacity-0 scale-95"
-        class="bg-white rounded-lg shadow p-6 mb-6"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0 -translate-y-2"
+        class="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border border-slate-200 shadow-xl p-5 z-20"
+        style="position: static; margin-top: 0;"
     >
-        <form method="get" class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <!-- Data Início -->
-            <div>
-                <label for="data_inicio" class="block text-sm font-medium text-gray-700 mb-2">
-                    Data Início
-                </label>
-                <input 
-                    type="date" 
-                    name="data_inicio" 
-                    id="data_inicio"
-                    value="{{ data_inicio }}"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
+    </div>
+</div>
+
+<!-- Filtros (fora do x-data do cabeçalho para simplicidade) -->
+<div x-data="{ showFilters: {% if data_inicio or data_fim or tipo_filtro or origem_filtro %}true{% else %}false{% endif %} }"
+     class="mb-5">
+    <div
+        x-show="showFilters"
+        x-cloak
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 -translate-y-1"
+        x-transition:enter-end="opacity-100 translate-y-0"
+        class="bg-white rounded-2xl border border-slate-200/80 shadow-card p-5"
+    >
+        <form method="get" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+            <div class="flex flex-col gap-1.5">
+                <label for="data_inicio" class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Data início</label>
+                <input type="date" name="data_inicio" id="data_inicio" value="{{ data_inicio }}"
+                       class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent transition">
             </div>
-            
-            <!-- Data Fim -->
-            <div>
-                <label for="data_fim" class="block text-sm font-medium text-gray-700 mb-2">
-                    Data Fim
-                </label>
-                <input 
-                    type="date" 
-                    name="data_fim" 
-                    id="data_fim"
-                    value="{{ data_fim }}"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
+
+            <div class="flex flex-col gap-1.5">
+                <label for="data_fim" class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Data fim</label>
+                <input type="date" name="data_fim" id="data_fim" value="{{ data_fim }}"
+                       class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent transition">
             </div>
-            
-            <!-- Tipo -->
-            <div>
-                <label for="tipo" class="block text-sm font-medium text-gray-700 mb-2">
-                    Tipo
-                </label>
-                <select 
-                    name="tipo" 
-                    id="tipo"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
+
+            <div class="flex flex-col gap-1.5">
+                <label for="tipo" class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Tipo</label>
+                <select name="tipo" id="tipo"
+                        class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent transition">
                     <option value="">Todos</option>
-                    <option value="IN" {% if tipo_filtro == "IN" %}selected{% endif %}>Entrada</option>
+                    <option value="IN"  {% if tipo_filtro == "IN"  %}selected{% endif %}>Entrada</option>
                     <option value="OUT" {% if tipo_filtro == "OUT" %}selected{% endif %}>Saída</option>
                 </select>
             </div>
-            
-            <!-- Origem -->
-            <div>
-                <label for="origem" class="block text-sm font-medium text-gray-700 mb-2">
-                    Origem
-                </label>
-                <select 
-                    name="origem" 
-                    id="origem"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
+
+            <div class="flex flex-col gap-1.5">
+                <label for="origem" class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Origem</label>
+                <select name="origem" id="origem"
+                        class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent transition">
                     <option value="">Todas</option>
                     <option value="SISTEMA" {% if origem_filtro == "SISTEMA" %}selected{% endif %}>Sistema</option>
-                    <option value="MANUAL" {% if origem_filtro == "MANUAL" %}selected{% endif %}>Manual</option>
-                    <option value="AJUSTE" {% if origem_filtro == "AJUSTE" %}selected{% endif %}>Ajuste</option>
+                    <option value="MANUAL"  {% if origem_filtro == "MANUAL"  %}selected{% endif %}>Manual</option>
+                    <option value="AJUSTE"  {% if origem_filtro == "AJUSTE"  %}selected{% endif %}>Ajuste</option>
                 </select>
             </div>
-            
-            <!-- Botões -->
-            <div class="md:col-span-4 flex space-x-4">
-                <button 
-                    type="submit"
-                    class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-semibold transition-colors"
-                >
-                    Aplicar Filtros
+
+            <div class="sm:col-span-2 lg:col-span-4 flex items-center gap-3 pt-1">
+                <button type="submit"
+                        class="px-5 py-2 rounded-xl bg-brand-700 text-white text-sm font-semibold hover:bg-brand-800 transition-colors shadow-sm">
+                    Aplicar filtros
                 </button>
-                <a 
-                    href="{% url 'jornada:historico' %}"
-                    class="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 font-semibold transition-colors"
-                >
+                <a href="{% url 'jornada:historico' %}"
+                   class="px-5 py-2 rounded-xl bg-slate-100 text-slate-600 text-sm font-medium hover:bg-slate-200 transition-colors">
                     Limpar
                 </a>
             </div>
         </form>
     </div>
-    
-    <!-- Estatísticas Rápidas -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-        <div class="bg-white rounded-lg shadow p-4">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-gray-600">Total Registros</p>
-                    <p class="text-2xl font-bold text-gray-900">{{ total_registros }}</p>
-                </div>
-                <div class="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
-                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-                    </svg>
-                </div>
-            </div>
-        </div>
-        
-        <div class="bg-white rounded-lg shadow p-4">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-gray-600">Com Foto</p>
-                    <p class="text-2xl font-bold text-green-600">{{ registros_com_foto }}</p>
-                </div>
-                <div class="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
-                    <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                    </svg>
-                </div>
-            </div>
-        </div>
-        
-        <div class="bg-white rounded-lg shadow p-4">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-gray-600">Com GPS</p>
-                    <p class="text-2xl font-bold text-purple-600">{{ registros_com_gps }}</p>
-                </div>
-                <div class="h-12 w-12 bg-purple-100 rounded-full flex items-center justify-center">
-                    <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                    </svg>
-                </div>
-            </div>
-        </div>
-        
-        <div class="bg-white rounded-lg shadow p-4">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-gray-600">Dias Trabalhados</p>
-                    <p class="text-2xl font-bold text-orange-600">{{ dias_trabalhados }}</p>
-                </div>
-                <div class="h-12 w-12 bg-orange-100 rounded-full flex items-center justify-center">
-                    <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                    </svg>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Registros Agrupados por Data -->
-    {% if registros_por_data %}
-        <div class="space-y-6">
-            {% for data, registros in registros_por_data.items %}
-                <div class="bg-white rounded-lg shadow overflow-hidden">
-                    <!-- Header da Data -->
-                    <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4">
-                        <div class="flex items-center justify-between">
-                            <h2 class="text-white font-bold text-lg">
-                                {{ data|date:"l, d/m/Y"|title }}
-                            </h2>
-                            <span class="bg-white bg-opacity-20 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                                {{ registros|length }} registro{{ registros|length|pluralize }}
-                            </span>
-                        </div>
-                    </div>
-                    
-                    <!-- Registros -->
-                    <div class="divide-y divide-gray-200">
-                        {% for registro in registros %}
-                            <div class="p-6 hover:bg-gray-50 transition-colors">
-                                <div class="flex items-start justify-between">
-                                    <!-- Info Principal -->
-                                    <div class="flex items-start space-x-4 flex-1">
-                                        <!-- Ícone Tipo -->
-                                        <div class="flex-shrink-0">
-                                            {% if registro.tipo == 'IN' %}
-                                                <div class="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
-                                                    <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path>
-                                                    </svg>
-                                                </div>
-                                            {% else %}
-                                                <div class="h-12 w-12 bg-red-100 rounded-full flex items-center justify-center">
-                                                    <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-                                                    </svg>
-                                                </div>
-                                            {% endif %}
-                                        </div>
-                                        
-                                        <!-- Detalhes -->
-                                        <div class="flex-1">
-                                            <div class="flex items-center space-x-3 mb-2">
-                                                <h3 class="text-xl font-bold text-gray-900">
-                                                    {{ registro.data_hora|date:"H:i" }}
-                                                </h3>
-                                                <span class="px-2 py-1 text-xs font-semibold rounded-full {% if registro.tipo == 'IN' %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
-                                                    {{ registro.get_tipo_display }}
-                                                </span>
-                                                
-                                                <!-- Badge Origem -->
-                                                {% if registro.origem == 'AJUSTE' %}
-                                                    <span class="px-2 py-1 text-xs font-semibold bg-orange-100 text-orange-800 rounded-full">
-                                                        Ajustado
-                                                    </span>
-                                                {% elif registro.origem == 'MANUAL' %}
-                                                    <span class="px-2 py-1 text-xs font-semibold bg-purple-100 text-purple-800 rounded-full">
-                                                        Manual
-                                                    </span>
-                                                {% endif %}
-                                            </div>
-                                            
-                                            <!-- Ícones de Validação -->
-                                            <div class="flex items-center space-x-4 text-sm text-gray-600">
-                                                <!-- Foto -->
-                                                {% if registro.foto %}
-                                                    <div class="flex items-center space-x-1 text-green-600">
-                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                                        </svg>
-                                                        <span class="font-medium">Com foto</span>
-                                                    </div>
-                                                {% else %}
-                                                    <div class="flex items-center space-x-1 text-gray-400">
-                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
-                                                        </svg>
-                                                        <span>Sem foto</span>
-                                                    </div>
-                                                {% endif %}
-                                                
-                                                <!-- GPS -->
-                                                {% if registro.latitude and registro.longitude %}
-                                                    <div class="flex items-center space-x-1 text-purple-600">
-                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                                        </svg>
-                                                        <span class="font-medium">GPS</span>
-                                                        {% if registro.local_utilizado %}
-                                                            <span class="text-gray-500">({{ registro.local_utilizado.nome }})</span>
-                                                        {% endif %}
-                                                    </div>
-                                                {% else %}
-                                                    <div class="flex items-center space-x-1 text-gray-400">
-                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-                                                        </svg>
-                                                        <span>Sem GPS</span>
-                                                    </div>
-                                                {% endif %}
-                                                
-                                                <!-- IP -->
-                                                {% if registro.ip_origem %}
-                                                    <div class="flex items-center space-x-1 text-blue-600">
-                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path>
-                                                        </svg>
-                                                        <code class="text-xs font-mono">{{ registro.ip_origem }}</code>
-                                                    </div>
-                                                {% endif %}
-                                                
-                                                <!-- Validação Local -->
-                                                {% if registro.validacao_local %}
-                                                    <div class="flex items-center space-x-1 text-green-600">
-                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                                        </svg>
-                                                        <span class="font-medium">Validado</span>
-                                                    </div>
-                                                {% endif %}
-                                            </div>
-                                            
-                                            <!-- Observação -->
-                                            {% if registro.observacao %}
-                                                <div class="mt-2 bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
-                                                    <p class="text-sm text-yellow-800">
-                                                        <strong>Obs:</strong> {{ registro.observacao }}
-                                                    </p>
-                                                </div>
-                                            {% endif %}
-
-                                            <!-- Justificativa Sem Foto -->
-                                            {% if registro.justificativa_sem_foto %}
-                                                <div class="mt-2 bg-orange-50 border-l-4 border-orange-400 p-3 rounded">
-                                                    <p class="text-sm text-orange-800">
-                                                        <strong>⚠️ Sem Foto:</strong> {{ registro.justificativa_sem_foto }}
-                                                    </p>
-                                                </div>
-                                            {% endif %}
-
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Ações -->
-                                    <div class="flex items-center space-x-2 ml-4">
-                                        <!-- Ver Foto -->
-                                        {% if registro.foto %}
-                                            <button 
-                                                @click="openPhotoModal('{{ registro.foto.url }}')"
-                                                class="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                title="Ver foto"
-                                            >
-                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                                                </svg>
-                                            </button>
-                                        {% endif %}
-                                        
-                                        <!-- Ver no Mapa -->
-                                        {% if registro.latitude and registro.longitude %}
-                                            <a 
-                                                href="https://www.google.com/maps?q={{ registro.latitude }},{{ registro.longitude }}" 
-                                                target="_blank"
-                                                class="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                                                title="Ver no mapa"
-                                            >
-                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
-                                                </svg>
-                                            </a>
-                                        {% endif %}
-                                        
-                                        <!-- Solicitar Ajuste -->
-                                        {% if registro.status == 'ATIVO' and registro.origem != 'AJUSTE' %}
-                                            <a 
-                                                href="{% url 'jornada:solicitar_ajuste' registro.id %}"
-                                                class="flex items-center space-x-1 px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-semibold text-sm transition-colors"
-                                                title="Solicitar correção deste registro"
-                                            >
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                                                </svg>
-                                                <span>Solicitar Ajuste</span>
-                                            </a>
-                                        {% endif %}
-                                        
-                                        <!-- Substituído -->
-                                        {% if registro.status == 'SUBSTITUIDO' %}
-                                            <span class="px-3 py-2 bg-gray-200 text-gray-600 rounded-lg font-semibold text-sm flex items-center space-x-1">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
-                                                </svg>
-                                                <span>Substituído</span>
-                                            </span>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-                        {% endfor %}
-                    </div>
-                </div>
-            {% endfor %}
-        </div>
-    {% else %}
-        <div class="bg-white rounded-lg shadow p-12 text-center">
-            <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-            </svg>
-            <p class="text-gray-500 text-lg">Nenhum registro encontrado.</p>
-            <p class="text-gray-400 text-sm mt-2">Tente ajustar os filtros ou o período selecionado.</p>
-        </div>
-    {% endif %}
 </div>
 
-<!-- Modal de Foto -->
-<div 
+<!-- ══════════════════════════════════════════
+     ESTATÍSTICAS
+══════════════════════════════════════════ -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+
+    <div class="stat-card bg-white rounded-2xl border border-slate-200/80 p-4 shadow-card flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+            </svg>
+        </div>
+        <div>
+            <p class="text-2xl font-bold text-slate-800 leading-none">{{ total_registros }}</p>
+            <p class="text-xs text-slate-500 mt-0.5">Total de registros</p>
+        </div>
+    </div>
+
+    <div class="stat-card bg-white rounded-2xl border border-slate-200/80 p-4 shadow-card flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+        </div>
+        <div>
+            <p class="text-2xl font-bold text-slate-800 leading-none">{{ registros_com_foto }}</p>
+            <p class="text-xs text-slate-500 mt-0.5">Com foto</p>
+        </div>
+    </div>
+
+    <div class="stat-card bg-white rounded-2xl border border-slate-200/80 p-4 shadow-card flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+        </div>
+        <div>
+            <p class="text-2xl font-bold text-slate-800 leading-none">{{ registros_com_gps }}</p>
+            <p class="text-xs text-slate-500 mt-0.5">Com GPS</p>
+        </div>
+    </div>
+
+    <div class="stat-card bg-white rounded-2xl border border-slate-200/80 p-4 shadow-card flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+        </div>
+        <div>
+            <p class="text-2xl font-bold text-slate-800 leading-none">{{ dias_trabalhados }}</p>
+            <p class="text-xs text-slate-500 mt-0.5">Dias trabalhados</p>
+        </div>
+    </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════
+     LISTA POR DIA (TIMELINE)
+══════════════════════════════════════════ -->
+{% if registros_por_data %}
+<div class="space-y-4">
+    {% for data, registros in registros_por_data.items %}
+    <div class="dia-group" style="animation-delay: {{ forloop.counter0 }}00ms; animation-delay: calc({{ forloop.counter0 }} * 0.06s);">
+
+        <!-- Header do dia -->
+        <div class="flex items-center gap-3 mb-2 px-1">
+            <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-brand-800 flex flex-col items-center justify-center shadow-sm">
+                <span class="text-white text-xs font-bold leading-none">{{ data|date:"d" }}</span>
+                <span class="text-brand-200 text-[9px] uppercase tracking-wide leading-none mt-0.5">{{ data|date:"M" }}</span>
+            </div>
+            <div class="flex-1 min-w-0">
+                <h2 class="text-sm font-bold text-slate-700 capitalize">
+                    {{ data|date:"l, d \d\e F \d\e Y"|lower|capfirst }}
+                </h2>
+            </div>
+            <span class="flex-shrink-0 text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
+                {{ registros|length }} registro{{ registros|length|pluralize }}
+            </span>
+        </div>
+
+        <!-- Card do dia -->
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-card overflow-hidden">
+
+            {% for registro in registros %}
+            <div class="registro-card px-4 sm:px-5 py-4 {% if not forloop.last %}border-b border-slate-100{% endif %}">
+
+                <div class="flex items-start gap-3 sm:gap-4">
+
+                    <!-- ── Ícone tipo ── -->
+                    <div class="flex-shrink-0 registro-dot mt-0.5">
+                        {% if registro.tipo == 'IN' %}
+                        <div class="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+                            </svg>
+                        </div>
+                        {% else %}
+                        <div class="w-9 h-9 rounded-xl bg-red-50 border border-red-200 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                            </svg>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- ── Corpo ── -->
+                    <div class="flex-1 min-w-0">
+
+                        <!-- Linha principal: hora + badges -->
+                        <div class="flex flex-wrap items-center gap-2 mb-2">
+                            <span class="font-mono text-xl font-bold text-slate-800 tabular-nums">
+                                {{ registro.data_hora|date:"H:i" }}
+                            </span>
+
+                            <!-- Tipo -->
+                            <span class="px-2 py-0.5 rounded-md text-xs font-semibold
+                                {% if registro.tipo == 'IN' %}tipo-entrada{% else %}tipo-saida{% endif %}">
+                                {{ registro.get_tipo_display }}
+                            </span>
+
+                            <!-- Origem -->
+                            {% if registro.origem == 'AJUSTE' %}
+                            <span class="px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                Ajustado
+                            </span>
+                            {% elif registro.origem == 'MANUAL' %}
+                            <span class="px-2 py-0.5 rounded-md text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-200">
+                                Manual
+                            </span>
+                            {% endif %}
+
+                            <!-- Substituído -->
+                            {% if registro.status == 'SUBSTITUIDO' %}
+                            <span class="px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200 line-through">
+                                Substituído
+                            </span>
+                            {% endif %}
+                        </div>
+
+                        <!-- Linha de metadados -->
+                        <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+
+                            <!-- Foto -->
+                            {% if registro.foto %}
+                            <span class="inline-flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                </svg>
+                                Foto
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center gap-1 text-xs text-slate-400">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                                </svg>
+                                Sem foto
+                            </span>
+                            {% endif %}
+
+                            <!-- GPS -->
+                            {% if registro.latitude and registro.longitude %}
+                            <span class="inline-flex items-center gap-1 text-xs text-violet-600 font-medium">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                </svg>
+                                {% if registro.local_utilizado %}{{ registro.local_utilizado.nome }}{% else %}GPS{% endif %}
+                            </span>
+                            {% endif %}
+
+                            <!-- IP -->
+                            {% if registro.ip_origem %}
+                            <span class="inline-flex items-center gap-1 text-xs text-slate-400 font-mono">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
+                                </svg>
+                                {{ registro.ip_origem }}
+                            </span>
+                            {% endif %}
+
+                            <!-- Validado -->
+                            {% if registro.validacao_local %}
+                            <span class="inline-flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                Validado
+                            </span>
+                            {% endif %}
+
+                        </div>
+
+                        <!-- Observação -->
+                        {% if registro.observacao %}
+                        <div class="mt-2 flex items-start gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                            <svg class="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                            </svg>
+                            <p class="text-xs text-amber-800">{{ registro.observacao }}</p>
+                        </div>
+                        {% endif %}
+
+                        <!-- Justificativa sem foto -->
+                        {% if registro.justificativa_sem_foto %}
+                        <div class="mt-2 flex items-start gap-2 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg">
+                            <svg class="w-3.5 h-3.5 text-orange-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                            </svg>
+                            <p class="text-xs text-orange-800"><strong>Sem foto:</strong> {{ registro.justificativa_sem_foto }}</p>
+                        </div>
+                        {% endif %}
+
+                    </div>
+
+                    <!-- ── Ações ── -->
+                    <div class="flex-shrink-0 flex items-center gap-1 ml-1">
+
+                        {% if registro.foto %}
+                        <button onclick="openPhotoModal('{{ registro.foto.url }}')"
+                                class="p-2 rounded-lg text-slate-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                                title="Ver foto">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                            </svg>
+                        </button>
+                        {% endif %}
+
+                        {% if registro.latitude and registro.longitude %}
+                        <a href="https://www.google.com/maps?q={{ registro.latitude }},{{ registro.longitude }}"
+                           target="_blank"
+                           class="p-2 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-colors"
+                           title="Ver no mapa">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+                            </svg>
+                        </a>
+                        {% endif %}
+
+                        {% if registro.status == 'ATIVO' and registro.origem != 'AJUSTE' %}
+                        <a href="{% url 'jornada:solicitar_ajuste' registro.id %}"
+                           class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 text-xs font-semibold hover:bg-amber-100 transition-colors"
+                           title="Solicitar ajuste">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                            </svg>
+                            Ajuste
+                        </a>
+                        <!-- Mobile: só ícone -->
+                        <a href="{% url 'jornada:solicitar_ajuste' registro.id %}"
+                           class="sm:hidden p-2 rounded-lg text-amber-600 hover:bg-amber-50 transition-colors"
+                           title="Solicitar ajuste">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                            </svg>
+                        </a>
+                        {% endif %}
+
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<!-- ── Estado vazio ── -->
+<div class="bg-white rounded-2xl border border-slate-200/80 shadow-card p-16 text-center">
+    <div class="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+        <svg class="w-7 h-7 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+        </svg>
+    </div>
+    <p class="text-slate-700 font-semibold">Nenhum registro encontrado</p>
+    <p class="text-slate-400 text-sm mt-1">Tente ajustar os filtros ou o período selecionado.</p>
+    {% if data_inicio or data_fim or tipo_filtro or origem_filtro %}
+    <a href="{% url 'jornada:historico' %}"
+       class="inline-flex items-center gap-1.5 mt-4 px-4 py-2 rounded-xl bg-brand-50 text-brand-700 text-sm font-medium border border-brand-200 hover:bg-brand-100 transition-colors">
+        Limpar filtros
+    </a>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- ══════════════════════════════════════════
+     MODAL DE FOTO
+══════════════════════════════════════════ -->
+<div
     x-data="{ photoUrl: '', show: false }"
     @open-photo-modal.window="photoUrl = $event.detail; show = true"
     x-show="show"
     x-cloak
-    class="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4"
+    x-transition:enter="transition ease-out duration-200"
+    x-transition:enter-start="opacity-0"
+    x-transition:enter-end="opacity-100"
+    x-transition:leave="transition ease-in duration-150"
+    x-transition:leave-start="opacity-100"
+    x-transition:leave-end="opacity-0"
+    class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
     @click.self="show = false"
+    @keydown.escape.window="show = false"
 >
-    <div class="relative max-w-4xl w-full">
-        <button 
+    <div
+        x-show="show"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 scale-95"
+        x-transition:enter-end="opacity-100 scale-100"
+        class="relative max-w-2xl w-full"
+    >
+        <button
             @click="show = false"
-            class="absolute -top-12 right-0 text-white hover:text-gray-300"
+            class="absolute -top-10 right-0 p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
         >
-            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
             </svg>
         </button>
-        <img :src="photoUrl" class="w-full h-auto rounded-lg shadow-2xl">
+        <img :src="photoUrl" class="w-full h-auto rounded-2xl shadow-2xl">
+        <p class="text-center text-white/40 text-xs mt-3">Clique fora da imagem para fechar</p>
     </div>
 </div>
 
@@ -419,4 +501,5 @@ function openPhotoModal(url) {
     window.dispatchEvent(new CustomEvent('open-photo-modal', { detail: url }));
 }
 </script>
+
 {% endblock %}

@@ -4,33 +4,42 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="OnTime - Sistema Profissional de Controle de Jornada e Banco de Horas">
-    <meta name="theme-color" content="#3B82F6">
-    
-    <title>{% block titulo %}OnTime - Sistema de Controle de Jornada{% endblock %}</title>
-    
-    <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⏱️</text></svg>">
-    
+    <meta name="theme-color" content="#1e40af">
+
+    <title>{% block titulo %}OnTime{% endblock %} — OnTime</title>
+
+    <!-- Favicon SVG -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%231e40af'/><circle cx='50' cy='50' r='35' fill='none' stroke='white' stroke-width='5'/><line x1='50' y1='20' x2='50' y2='50' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='50' y1='50' x2='68' y2='62' stroke='white' stroke-width='5' stroke-linecap='round'/></svg>">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
     <!-- Tailwind CSS via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
+
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    
-    <!-- Alpine.js para interatividade -->
+
+    <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    
+
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="/estaticos/css/ontime.css">
-    
-    <!-- Configuração do Tailwind -->
+    <link rel="stylesheet" href="{% load static %}{% static 'css/ontime.css' %}">
+
+    <!-- Tailwind config -->
     <script>
         tailwind.config = {
             theme: {
                 extend: {
+                    fontFamily: {
+                        sans:  ['Sora', 'sans-serif'],
+                        mono:  ['JetBrains Mono', 'monospace'],
+                    },
                     colors: {
-                        primary: {
-                            50: '#eff6ff',
+                        brand: {
+                            50:  '#eff6ff',
                             100: '#dbeafe',
                             200: '#bfdbfe',
                             300: '#93c5fd',
@@ -40,77 +49,164 @@
                             700: '#1d4ed8',
                             800: '#1e40af',
                             900: '#1e3a8a',
+                            950: '#172554',
+                        },
+                        surface: {
+                            DEFAULT: '#ffffff',
+                            50:  '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
                         }
+                    },
+                    boxShadow: {
+                        'card':   '0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.06)',
+                        'navbar': '0 1px 0 rgba(0,0,0,0.08), 0 4px 20px rgba(30,64,175,0.12)',
                     }
                 }
             }
         }
     </script>
-    
-    <!-- Alpine cloak -->
+
     <style>
+        /* ── Reset & Base ── */
+        *, *::before, *::after { box-sizing: border-box; }
+
+        :root {
+            --sidebar-w: 256px;
+            --navbar-h: 60px;
+            --transition: 280ms cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        html { scroll-behavior: smooth; }
+        body { font-family: 'Sora', sans-serif; background: #f1f5f9; }
+
+        /* ── Scrollbar refinada ── */
+        ::-webkit-scrollbar              { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track        { background: transparent; }
+        ::-webkit-scrollbar-thumb        { background: #cbd5e1; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover  { background: #94a3b8; }
+
+        /* ── Alpine cloak ── */
         [x-cloak] { display: none !important; }
+
+        /* ── Sidebar transition ── */
+        #sidebar { transition: transform var(--transition); }
+
+        /* ── Main content offset ── */
+        @media (min-width: 1024px) {
+            #main-content { margin-left: var(--sidebar-w); }
+        }
+
+        /* ── Page fade-in ── */
+        #page-wrapper {
+            animation: pageFadeIn 0.35s ease both;
+        }
+        @keyframes pageFadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── HTMX loading bar ── */
+        #loading-bar {
+            position: fixed;
+            top: 0; left: 0;
+            height: 2px;
+            width: 0%;
+            background: linear-gradient(90deg, #2563eb, #60a5fa);
+            z-index: 9999;
+            transition: width 0.3s ease, opacity 0.3s ease;
+            box-shadow: 0 0 8px rgba(37,99,235,0.6);
+        }
+
+        /* ── Focus ring global ── */
+        :focus-visible {
+            outline: 2px solid #2563eb;
+            outline-offset: 2px;
+            border-radius: 4px;
+        }
     </style>
-    
+
     {% block extra_head %}{% endblock %}
 </head>
-<body class="h-full bg-gray-50 antialiased">
+
+<body class="h-full antialiased">
+
+    <!-- Loading bar (HTMX) -->
+    <div id="loading-bar"></div>
+
     {% if user.is_authenticated %}
-        <!-- Layout Autenticado -->
-        <div class="min-h-screen flex flex-col">
-            {% include "base/navbar.html" %}
-            
-            <div class="flex flex-1 pt-16">
-                {% include "base/sidebar.html" %}
-                
-                <!-- Main Content -->
-                <main class="flex-1 transition-all duration-300 lg:ml-64">
-                    <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                        {% include "base/mensagens.html" %}
-                        
-                        {% block conteudo %}{% endblock %}
-                    </div>
-                </main>
-            </div>
-            
+
+        <!-- ══════════════════════════════════════════
+             LAYOUT AUTENTICADO
+        ══════════════════════════════════════════ -->
+        {% include "base/navbar.html" %}
+        {% include "base/sidebar.html" %}
+
+        <!-- Main content -->
+        <div id="main-content" style="padding-top: var(--navbar-h);" class="min-h-screen flex flex-col">
+            <main class="flex-1 px-4 sm:px-6 lg:px-8 py-6">
+                <div id="page-wrapper" class="max-w-screen-xl mx-auto">
+                    {% include "base/mensagens.html" %}
+                    {% block conteudo %}{% endblock %}
+                </div>
+            </main>
             {% include "base/rodape.html" %}
         </div>
+
+        <!-- Overlay mobile sidebar -->
+        <div
+            id="sidebar-overlay"
+            class="fixed inset-0 bg-black/40 z-30 hidden lg:hidden backdrop-blur-sm"
+            onclick="closeSidebar()"
+        ></div>
+
     {% else %}
-        <!-- Layout Não Autenticado -->
-        <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-            {% block conteudo_sem_autenticacao %}{% endblock %}
-        </div>
+
+        <!-- ══════════════════════════════════════════
+             LAYOUT NÃO AUTENTICADO
+        ══════════════════════════════════════════ -->
+        {% block conteudo_sem_autenticacao %}{% endblock %}
+
     {% endif %}
-    
-    <!-- Scripts -->
-    <script src="/estaticos/js/ontime.js"></script>
-    <script src="/estaticos/js/htmx_handlers.js"></script>
-    
+
+    <!-- Scripts globais -->
+    {% load static %}
+    <script src="{% static 'js/ontime.js' %}"></script>
+    <script src="{% static 'js/htmx_handlers.js' %}"></script>
+
     {% block extra_scripts %}{% endblock %}
-    
-    <!-- Loading overlay (para HTMX) -->
-    <div 
-        id="loading-overlay" 
-        class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
-    >
-        <div class="bg-white rounded-lg p-6 flex items-center space-x-4">
-            <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <span class="text-gray-700 font-medium">Carregando...</span>
-        </div>
-    </div>
-    
-    <!-- HTMX Loading Indicator -->
+
+    <!-- HTMX loading bar -->
     <script>
-        document.body.addEventListener('htmx:beforeRequest', function() {
-            document.getElementById('loading-overlay').classList.remove('hidden');
-        });
-        
-        document.body.addEventListener('htmx:afterRequest', function() {
-            document.getElementById('loading-overlay').classList.add('hidden');
-        });
+        const bar = document.getElementById('loading-bar');
+        if (bar) {
+            document.body.addEventListener('htmx:beforeRequest', () => {
+                bar.style.width = '40%';
+                bar.style.opacity = '1';
+            });
+            document.body.addEventListener('htmx:afterRequest', () => {
+                bar.style.width = '100%';
+                setTimeout(() => { bar.style.opacity = '0'; bar.style.width = '0%'; }, 300);
+            });
+        }
+
+        // Sidebar mobile
+        function openSidebar() {
+            document.getElementById('sidebar').classList.remove('-translate-x-full');
+            document.getElementById('sidebar-overlay').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeSidebar() {
+            document.getElementById('sidebar').classList.add('-translate-x-full');
+            document.getElementById('sidebar-overlay').classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+        function toggleSidebar() {
+            const s = document.getElementById('sidebar');
+            if (s.classList.contains('-translate-x-full')) openSidebar();
+            else closeSidebar();
+        }
     </script>
+
 </body>
 </html>

@@ -1,55 +1,119 @@
-<nav class="bg-blue-600 text-white shadow-lg fixed w-full z-50">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between h-16">
-            <div class="flex items-center">
-                <button 
-                    id="menu-toggle"
-                    class="lg:hidden p-2 rounded-md hover:bg-blue-700"
-                    onclick="toggleSidebar()"
-                >
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+<nav
+    style="height: var(--navbar-h); background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 60%, #1d4ed8 100%);"
+    class="fixed top-0 left-0 right-0 z-50 flex items-center shadow-navbar"
+>
+    <!-- Linha decorativa inferior sutil -->
+    <div class="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-400/30 to-transparent"></div>
+
+    <div class="flex items-center justify-between w-full px-4 sm:px-6">
+
+        <!-- ── Esquerda: toggle + logo ── -->
+        <div class="flex items-center gap-3">
+
+            <!-- Burger mobile -->
+            <button
+                onclick="toggleSidebar()"
+                class="lg:hidden p-2 rounded-lg text-blue-200 hover:text-white hover:bg-white/10 transition-colors"
+                aria-label="Menu"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+            </button>
+
+            <!-- Logo -->
+            <a href="{% url 'jornada:painel' %}" class="flex items-center gap-2.5 group">
+                <div class="w-7 h-7 rounded-lg bg-white/15 border border-white/20 flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" stroke-width="2"/>
+                        <polyline points="12 6 12 12 16 14" stroke-width="2" stroke-linecap="round"/>
                     </svg>
-                </button>
-                
-                <h1 class="text-2xl font-bold ml-4">OnTime</h1>
-            </div>
-            
-            <div class="flex items-center space-x-4">
-                {% if empresa_ativa %}
-                    <span class="text-sm bg-blue-500 px-3 py-1 rounded-full">
-                        {{ empresa_ativa.nome_fantasia|default:empresa_ativa.razao_social }}
-                    </span>
-                {% endif %}
-                
-                <div class="relative" x-data="{ open: false }">
-                    <button 
-                        @click="open = !open"
-                        class="flex items-center space-x-2 hover:bg-blue-700 px-3 py-2 rounded-md"
-                    >
-                        <div class="w-8 h-8 bg-blue-400 rounded-full flex items-center justify-center">
-                            <span class="font-bold">{{ user.first_name.0|default:user.username.0|upper }}</span>
-                        </div>
-                        <span>{{ user.first_name|default:user.username }}</span>
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                        </svg>
-                    </button>
-                    
-                    <div 
-                        x-show="open"
-                        @click.away="open = false"
-                        x-transition
-                        class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 text-gray-700"
-                    >
-                        <a href="{% url 'usuarios:perfil' %}" class="block px-4 py-2 hover:bg-gray-100">
-                            Meu Perfil
-                        </a>
-                        <a href="{% url 'usuarios:logout' %}" class="block px-4 py-2 hover:bg-gray-100 text-red-600">
-                            Sair
-                        </a>
-                    </div>
                 </div>
+                <span class="text-white font-semibold text-lg tracking-tight leading-none">
+                    On<span class="text-blue-200">Time</span>
+                </span>
+            </a>
+
+            <!-- Empresa ativa (badge) -->
+            {% if empresa_ativa %}
+            <span class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/10 border border-white/15 text-blue-100 text-xs font-medium">
+                <svg class="w-3 h-3 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                </svg>
+                {{ empresa_ativa.nome_fantasia|default:empresa_ativa.razao_social|truncatechars:22 }}
+            </span>
+            {% endif %}
+        </div>
+
+        <!-- ── Direita: usuário dropdown ── -->
+        <div class="flex items-center gap-2" x-data="{ open: false }">
+
+            <!-- Avatar + nome -->
+            <button
+                @click="open = !open"
+                @click.away="open = false"
+                class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/10 transition-colors group"
+                aria-haspopup="true"
+                :aria-expanded="open"
+            >
+                <!-- Avatar inicial -->
+                <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-300 to-blue-500 flex items-center justify-center shadow-sm flex-shrink-0">
+                    <span class="text-white text-xs font-bold leading-none">
+                        {{ user.first_name.0|default:user.username.0|upper }}
+                    </span>
+                </div>
+
+                <div class="hidden sm:block text-left">
+                    <p class="text-white text-xs font-semibold leading-tight">
+                        {{ user.first_name|default:user.username|truncatechars:16 }}
+                    </p>
+                    <p class="text-blue-200/70 text-xs leading-tight font-normal">
+                        {{ user.get_papel_display|default:"Colaborador" }}
+                    </p>
+                </div>
+
+                <svg class="w-3.5 h-3.5 text-blue-200/60 transition-transform duration-200"
+                     :class="open ? 'rotate-180' : ''"
+                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+
+            <!-- Dropdown -->
+            <div
+                x-show="open"
+                x-cloak
+                x-transition:enter="transition ease-out duration-150"
+                x-transition:enter-start="opacity-0 scale-95 translate-y-1"
+                x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                x-transition:leave="transition ease-in duration-100"
+                x-transition:leave-start="opacity-100 scale-100"
+                x-transition:leave-end="opacity-0 scale-95"
+                class="absolute top-14 right-4 w-52 bg-white rounded-xl shadow-xl border border-slate-200/80 overflow-hidden z-50 py-1"
+            >
+                <!-- Info do usuário -->
+                <div class="px-4 py-3 border-b border-slate-100">
+                    <p class="text-sm font-semibold text-slate-800 truncate">{{ user.get_full_name|default:user.username }}</p>
+                    <p class="text-xs text-slate-400 truncate mt-0.5">{{ user.email|default:"—" }}</p>
+                </div>
+
+                <a href="{% url 'usuarios:perfil' %}"
+                   class="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 hover:text-brand-700 transition-colors">
+                    <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                    </svg>
+                    Meu Perfil
+                </a>
+
+                <div class="my-1 border-t border-slate-100"></div>
+
+                <a href="{% url 'usuarios:logout' %}"
+                   class="flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                    </svg>
+                    Sair
+                </a>
             </div>
         </div>
     </div>

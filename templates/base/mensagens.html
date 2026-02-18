@@ -1,12 +1,91 @@
 {% if messages %}
-    <div class="mb-6 space-y-2">
-        {% for message in messages %}
-            <div 
-                class="{% if message.tags == 'error' %}bg-red-100 border-red-400 text-red-700{% elif message.tags == 'success' %}bg-green-100 border-green-400 text-green-700{% elif message.tags == 'warning' %}bg-yellow-100 border-yellow-400 text-yellow-700{% else %}bg-blue-100 border-blue-400 text-blue-700{% endif %} border-l-4 p-4 rounded-md"
-                role="alert"
-            >
-                <p class="font-medium">{{ message }}</p>
-            </div>
-        {% endfor %}
+<div class="space-y-2 mb-6" id="mensagens-container">
+    {% for message in messages %}
+    <div
+        role="alert"
+        class="mensagem-item flex items-start gap-3 px-4 py-3 rounded-xl border text-sm font-medium
+               {% if message.tags == 'error' %}
+                   bg-red-50 border-red-200 text-red-800
+               {% elif message.tags == 'success' %}
+                   bg-emerald-50 border-emerald-200 text-emerald-800
+               {% elif message.tags == 'warning' %}
+                   bg-amber-50 border-amber-200 text-amber-800
+               {% else %}
+                   bg-blue-50 border-blue-200 text-blue-800
+               {% endif %}
+               shadow-sm"
+        style="animation: msgSlideIn 0.3s ease both;"
+    >
+        <!-- Ícone -->
+        <span class="flex-shrink-0 mt-0.5">
+            {% if message.tags == 'error' %}
+            <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" stroke-width="2"/>
+                <line x1="12" y1="8" x2="12" y2="12" stroke-width="2" stroke-linecap="round"/>
+                <line x1="12" y1="16" x2="12.01" y2="16" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            {% elif message.tags == 'success' %}
+            <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            {% elif message.tags == 'warning' %}
+            <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            {% else %}
+            <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            {% endif %}
+        </span>
+
+        <!-- Texto -->
+        <span class="flex-1 leading-snug">{{ message }}</span>
+
+        <!-- Fechar -->
+        <button
+            onclick="fecharMensagem(this)"
+            class="flex-shrink-0 ml-1 opacity-50 hover:opacity-100 transition-opacity"
+            aria-label="Fechar"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+        </button>
     </div>
+    {% endfor %}
+</div>
+
+<style>
+@keyframes msgSlideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes msgSlideOut {
+    from { opacity: 1; transform: translateY(0); max-height: 80px; margin-bottom: 0.5rem; }
+    to   { opacity: 0; transform: translateY(-8px); max-height: 0; margin-bottom: 0; padding: 0; }
+}
+.mensagem-saindo {
+    animation: msgSlideOut 0.25s ease forwards !important;
+    overflow: hidden;
+}
+</style>
+
+<script>
+function fecharMensagem(btn) {
+    const el = btn.closest('.mensagem-item');
+    el.classList.add('mensagem-saindo');
+    setTimeout(() => el.remove(), 260);
+}
+
+/* Auto-dismiss em 6 segundos para success e info */
+document.querySelectorAll('.mensagem-item').forEach((el, i) => {
+    const isSuccess = el.classList.contains('bg-emerald-50') || el.classList.contains('bg-blue-50');
+    if (isSuccess) {
+        setTimeout(() => {
+            if (el.isConnected) fecharMensagem(el.querySelector('button'));
+        }, 6000 + i * 300);
+    }
+});
+</script>
 {% endif %}
